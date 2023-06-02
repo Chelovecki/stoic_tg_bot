@@ -2,6 +2,7 @@
     "id_user": null,
     "cur_week": null,
     "cur_day": null,
+    "file_path": null,
     "1": {
         "1": {
             "morning": null,

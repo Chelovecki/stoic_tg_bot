@@ -14,6 +14,7 @@ def get_week_topic_as_jpeg(path_to_save: str, num_page: int):
         output = os.path.join('weeks_images', "outfile.png")
         pix.save(path_to_save)
 
+# get_week_topic_as_jpeg('week_images/week_1 photo_1.png', num_page=15)
 
 def write_in_json(name_and_path, dictionary):
     with open(name_and_path, 'w+', encoding='UTF-8') as file:
@@ -28,11 +29,7 @@ def read_from_json(name_and_path):
     filel.close()
     return dictionary
 
-questionss = read_from_json('res.json')
 
-weeks = read_from_json('week_path_images.json')
-
-book_info = {}
 
 # new_dict = {}
 # for key, value in questionss:
@@ -56,16 +53,16 @@ book_info = {}
 # write_in_json('db/book_info.json', book_info)
 
 
-user_info = {'id_user': None,
-             'cur_week': None,
-             'cur_day': None,}
-for week in range(1, 53):
-    print(week)
-    user_info[week] = {}
-    for day in range(1, 8):
-        user_info[week][day] = {'morning': None,
-                                 'evening': None}
-write_in_json(os.path.join('db', 'user_scale.json'), user_info)
+# user_info = {'id_user': None,
+#              'cur_week': None,
+#              'cur_day': None,}
+# for week in range(1, 53):
+#     print(week)
+#     user_info[week] = {}
+#     for day in range(1, 8):
+#         user_info[week][day] = {'morning': None,
+#                                  'evening': None}
+# write_in_json(os.path.join('db', 'user_scale.json'), user_info)
 
 
 

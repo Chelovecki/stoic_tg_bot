@@ -1,27 +1,95 @@
 import asyncio
 import logging
+# для получения токена бота
+import os
 
-from config_reader import config  # для получения токена бота
+from config_reader import config
 
-from aiogram import types
+# для удобной работы бота
+from aiogram.types import Message
 from aiogram.filters.command import Command
 from aiogram.filters import Text
 from aiogram import Bot, Dispatcher
 
-import db.main_commands
+# импортруем роутеры
+from show.week_info import show_week_topic_router
+from set.add_morning_evening_info import add_reflections_router
+from show.show_my_day_reflections import show_day_reflections_router
+
+# db
+from db.main_commands import add_user_in_db, get_user_data
+
+# json
+from tools.json import read_from_json, write_in_json
+
+# клавиатуры
+from tools.keyboards.default import process_new_user, main_menu_kb
+
+# для создания автомата переходов
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
+
 # Объект бота
 bot = Bot(token=config.bot_token.get_secret_value(), parse_mode='HTML')
+
 # Диспетчер
 dp = Dispatcher()
+dp.include_routers(show_week_topic_router, add_reflections_router, show_day_reflections_router)
+
+# автомат переходов
+class Filling_User_Info(StatesGroup):
+    await_week_day_info = State()
+
 
 # Хэндлер на команду /start
 @dp.message(Command('start'))
-async def cmd_start(message: types.Message):
-    this_user = message.from_user.id
-    await message.answer('Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?\nЕсли заполняешь, то введи  свой прогресс в форме')
+async def cmd_start(message: Message):
+    add_user_in_db(id_user=message.from_user.id)
+    await message.answer('Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?', reply_markup=process_new_user())
 
+@dp.message(Command('menu'))
+@dp.message(Text('Главное меню'))
+async def main_menu(message: Message):
+    await message.answer(text='Что сделаем?', reply_markup=main_menu_kb())
+
+
+@dp.message(Text('Я уже заполняю дневник'))
+async def im_yet(message: Message, state: FSMContext):
+    await state.set_state(Filling_User_Info.await_week_day_info)
+    await message.answer(text='Введи свой прогресс в формате номер_недели:какой_по_счету_день_недели')
+
+@dp.message(Text('Я еще не смешарик'))
+async def im_not_yet(message: Message):
+    user_data = get_user_data(id_user=message.from_user.id)
+    if user_data['cur_week'] and user_data['cur_day']:
+        await message.answer('ты не можешь сбросить свои данные крч мне бля впадлу щас все пилить все эти да нет деревья')
+        return
+    user_data['cur_week'] = 1
+    user_data['cur_day'] = 1
+    user_data['file_path'] = os.path.join(os.path.abspath('db'), 'users_data', f'{message.from_user.id}.json')
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Ок, тогда начнем с начала', reply_markup=main_menu_kb())
+
+@dp.message(Filling_User_Info.await_week_day_info)
+async def get_cur_week_and_day(message: Message, state: FSMContext):
+    try:
+        week, day = message.text.split(':')
+        if not(1 <= int(week) <= 52):
+            raise Exception
+        if not(1 <= int(day) <= 7):
+            raise Exception
+    except Exception:
+        await message.answer('Что-то ты не то ввел')
+        await im_yet(message=message, state=state)
+
+    user_data = get_user_data(id_user=message.from_user.id)
+    user_data['cur_week'] = week
+    user_data['cur_day'] = day
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Ок', reply_markup=main_menu_kb())
 
 # Запуск процесса поллинга новых апдейтов
 async def main():
