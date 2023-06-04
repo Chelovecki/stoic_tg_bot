@@ -23,7 +23,7 @@ from db.main_commands import add_user_in_db, get_user_data
 from tools.json import read_from_json, write_in_json
 
 # клавиатуры
-from tools.keyboards.default import process_new_user, main_menu_kb
+from tools.keyboards.default import process_new_user, main_menu_kb, sure_or_not
 
 # для создания автомата переходов
 from aiogram.fsm.state import State, StatesGroup
@@ -43,6 +43,9 @@ dp.include_routers(show_week_topic_router, add_reflections_router, show_day_refl
 class Filling_User_Info(StatesGroup):
     await_week_day_info = State()
 
+    am_i_sure_nex_day = State()
+
+    null = State()
 
 # Хэндлер на команду /start
 @dp.message(Command('start'))
@@ -50,6 +53,8 @@ async def cmd_start(message: Message):
     add_user_in_db(id_user=message.from_user.id)
     await message.answer('Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?', reply_markup=process_new_user())
 
+
+@dp.message(Text('Отмена'))
 @dp.message(Command('menu'))
 @dp.message(Text('Главное меню'))
 async def main_menu(message: Message):
@@ -81,15 +86,48 @@ async def get_cur_week_and_day(message: Message, state: FSMContext):
             raise Exception
         if not(1 <= int(day) <= 7):
             raise Exception
+
+        user_data = get_user_data(id_user=message.from_user.id)
+        user_data['cur_week'] = week
+        user_data['cur_day'] = day
+        user_data['file_path'] = os.path.join(os.path.abspath('db'), 'users_data', f'{message.from_user.id}.json')
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+        await message.answer('Ок', reply_markup=main_menu_kb())
+        
     except Exception:
         await message.answer('Что-то ты не то ввел')
         await im_yet(message=message, state=state)
 
-    user_data = get_user_data(id_user=message.from_user.id)
-    user_data['cur_week'] = week
-    user_data['cur_day'] = day
-    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
-    await message.answer('Ок', reply_markup=main_menu_kb())
+
+
+
+@dp.message(Text('Следующий день'))
+async def confirm(message: Message, state: FSMContext):
+    await state.set_state(Filling_User_Info.am_i_sure_nex_day)
+    await message.answer('Уверен? Если что, можешь потом исправить/дописать.', reply_markup=sure_or_not())
+
+
+@dp.message(Filling_User_Info.am_i_sure_nex_day)
+async def confirm_if_yes(message: Message, state: FSMContext):
+    await state.set_state(Filling_User_Info.null)
+    if message.text == 'Да, уверен':
+        user_data = get_user_data(id_user=message.from_user.id)
+
+        user_day = int(user_data['cur_day'])
+        user_week = int(user_data['cur_week'])
+
+        user_day += 1
+        if user_day == 8:
+            user_week += 1
+            user_day = 1
+
+        user_data['cur_week'] = user_week
+        user_data['cur_day'] = user_day
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+        await message.answer(f'Ок, неделя №{user_week}, вопрос №{user_day}', reply_markup=main_menu_kb())
+    else:
+        await state.set_state(Filling_User_Info.null)
+        await message.answer('Оболтус, хватит на кнопочки тыкать', reply_markup=main_menu_kb())
 
 # Запуск процесса поллинга новых апдейтов
 async def main():
