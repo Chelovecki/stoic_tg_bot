@@ -54,7 +54,7 @@ async def cmd_start(message: Message):
     await message.answer('Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?', reply_markup=process_new_user())
 
 
-@dp.message(Text('Отмена'))
+
 @dp.message(Command('menu'))
 @dp.message(Text('Главное меню'))
 async def main_menu(message: Message):
@@ -86,17 +86,18 @@ async def get_cur_week_and_day(message: Message, state: FSMContext):
             raise Exception
         if not(1 <= int(day) <= 7):
             raise Exception
-
+        await state.set_state(Filling_User_Info.null)
         user_data = get_user_data(id_user=message.from_user.id)
         user_data['cur_week'] = week
         user_data['cur_day'] = day
         user_data['file_path'] = os.path.join(os.path.abspath('db'), 'users_data', f'{message.from_user.id}.json')
         write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
         await message.answer('Ок', reply_markup=main_menu_kb())
+
         
-    except Exception:
+    except Exception as e:
         await message.answer('Что-то ты не то ввел')
-        await im_yet(message=message, state=state)
+
 
 
 

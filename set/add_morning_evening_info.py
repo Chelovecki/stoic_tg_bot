@@ -41,20 +41,22 @@ async def morning_reflections(message: Message, state: FSMContext):
 
 @add_reflections_router.message(AddReflections.morning)
 async def morning(message: Message, state: FSMContext):
-
     await state.set_state(AddReflections.null)
 
-    user_data = get_user_data(id_user=message.from_user.id)
-    user_week, user_day = user_data['cur_week'], user_data['cur_day']
-    user_day = str(user_day)
-    user_week = str(user_week)
+    if message.text != 'Отмена':
+        user_data = get_user_data(id_user=message.from_user.id)
+        user_week, user_day = user_data['cur_week'], user_data['cur_day']
+        user_day = str(user_day)
+        user_week = str(user_week)
 
-    if user_data[user_week][user_day]['morning'] is None:
-        user_data[user_week][user_day]['morning'] = message.text
+        if user_data[user_week][user_day]['morning'] is None:
+            user_data[user_week][user_day]['morning'] = message.text
+        else:
+            user_data[user_week][user_day]['morning'] += f'\n{message.text}'
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+        await message.answer('Сохранил утренние размышления', reply_markup=main_menu_kb())
     else:
-        user_data[user_week][user_day]['morning'] += f'\n{message.text}'
-    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
-    await message.answer('Сохранил утренние размышления', reply_markup=main_menu_kb())
+        await message.answer('НУ... ладно', reply_markup=main_menu_kb())
 
 
 
@@ -73,19 +75,22 @@ async def evening_reflections(message: Message, state: FSMContext):
 
 @add_reflections_router.message(AddReflections.evening)
 async def evening(message: Message, state: FSMContext):
+
     await state.set_state(AddReflections.null)
+    if message.text != 'Отмена':
+        user_data = get_user_data(id_user=message.from_user.id)
+        user_week, user_day = user_data['cur_week'], user_data['cur_day']
+        user_day = str(user_day)
+        user_week = str(user_week)
 
-    user_data = get_user_data(id_user=message.from_user.id)
-    user_week, user_day = user_data['cur_week'], user_data['cur_day']
-    user_day = str(user_day)
-    user_week = str(user_week)
-
-    if user_data[user_week][user_day]['evening'] is None:
-        user_data[user_week][user_day]['evening'] = message.text
+        if user_data[user_week][user_day]['evening'] is None:
+            user_data[user_week][user_day]['evening'] = message.text
+        else:
+            user_data[user_week][user_day]['evening'] += f'\n{message.text}'
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+        await message.answer('Сохранил вечерние мысли', reply_markup=main_menu_kb())
     else:
-        user_data[user_week][user_day]['evening'] += f'\n{message.text}'
-    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
-    await message.answer('Сохранил вечерние мысли', reply_markup=main_menu_kb())
+        await message.answer('Жеесть', reply_markup=main_menu_kb())
 
 
 
