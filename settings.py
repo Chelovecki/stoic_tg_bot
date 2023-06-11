@@ -24,7 +24,7 @@ class SettingsAutomat(StatesGroup):
     waiting_answer = State()
     change_progress = State()
     chose_period_for_show = State()
-@settings_router.message(Text('Настройки'))
+@settings_router.message(Text('Прочее'))
 async def settings(message: Message):
     await message.answer("""
     Что здесь находится:
@@ -116,4 +116,32 @@ async def yesterday_reflections(message: Message):
     await message.answer(text=text_to_ouput, parse_mode='html', reply_markup=settings_kb())
 
 async def week_reflections(message: Message):
-    pass
+    user_data = get_user_data(id_user=message.from_user.id)
+    book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
+
+    user_week = str(user_data['cur_week'])
+
+    texts_to_output = [f'Неделя №{user_data["cur_week"]}']
+    for day in range(1, int(user_data['cur_day']) + 1):
+        text = f'День №{day}. Вопрос: <i>{book_info[f"week_{user_week}"]["questions"][str(day)]}</i>\n{60 * "-"}\n'
+
+        morning_reflections = user_data[user_week][str(day)]["morning"]
+        evening_reflections = user_data[user_week][str(day)]["evening"]
+
+        if morning_reflections:
+            text += '<b>Утренние размышления</b>:\n'
+            text += morning_reflections
+            text += f'\n{60 * "-"}\n'
+        if evening_reflections:
+            text += '<b>Вечерние размышления</b>:\n'
+            text += evening_reflections
+        # если утренние или вечерние записи были, добавляем в список для вывода потом
+        if 'Утренние размышления' in text or 'Вечерние размышления' in text:
+            texts_to_output.append(text)
+    if len(texts_to_output) == 1:
+        await message.answer('Но ты еще ничего не заполнял на этой неделе', reply_markup=settings_kb())
+    else:
+        for text in texts_to_output:
+            # добавление маркапа ко всем сообщениям не делает работу программы быстрее, так что пофиг пусть так будет, чем только на последнее сообщение
+            await message.answer(text, parse_mode='html', reply_markup=settings_kb())
+
