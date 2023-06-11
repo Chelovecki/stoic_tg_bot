@@ -15,6 +15,7 @@ from aiogram import Bot, Dispatcher
 from show.week_info import show_week_topic_router
 from set.add_morning_evening_info import add_reflections_router
 from show.show_my_day_reflections import show_day_reflections_router
+from settings import settings_router
 
 # db
 from db.main_commands import add_user_in_db, get_user_data
@@ -37,7 +38,7 @@ bot = Bot(token=config.bot_token.get_secret_value(), parse_mode='HTML')
 
 # Диспетчер
 dp = Dispatcher()
-dp.include_routers(show_week_topic_router, add_reflections_router, show_day_reflections_router)
+dp.include_routers(show_week_topic_router, add_reflections_router, show_day_reflections_router, settings_router)
 
 # автомат переходов
 class Filling_User_Info(StatesGroup):

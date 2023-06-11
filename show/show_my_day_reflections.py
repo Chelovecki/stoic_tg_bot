@@ -23,7 +23,7 @@ class ShowSpecialNotes(StatesGroup):
     null = State()
 
 
-@show_day_reflections_router.message(Text('Покажи размышления за сегодня'))
+@show_day_reflections_router.message(Text('Размышления за сегодня'))
 async def show_today_reflections(message: Message):
     text_for_ouput = ''
     user_data = get_user_data(id_user=message.from_user.id)
@@ -44,7 +44,7 @@ async def show_today_reflections(message: Message):
         text_for_ouput += morning
         text_for_ouput += f'\n{"-"*14}\n'
     if evening:
-        text_for_ouput += f'\n<b>Вечерние размышления:</b>\n'
+        text_for_ouput += f'<b>Вечерние размышления:</b>\n'
         text_for_ouput += evening
         text_for_ouput += '\n'
 

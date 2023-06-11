@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from tools.json import read_from_json, write_in_json
+
 if __name__ == '__main__':
     path_for_db = os.path.abspath('stoic_db.db')
     users_path_new_files = os.path.abspath('users_data')
