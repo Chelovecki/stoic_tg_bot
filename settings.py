@@ -25,7 +25,10 @@ class SettingsAutomat(StatesGroup):
     change_progress = State()
 
     chose_period_for_show = State()
+
     wait_exact_week = State()
+    wait_exact_day_and_week = State()
+
 
 @settings_router.message(Text('Прочее'))
 async def settings(message: Message):
@@ -86,6 +89,9 @@ async def show_reflections(message: Message, state: FSMContext):
     elif message.text == 'n неделя':
         await state.set_state(SettingsAutomat.wait_exact_week)
         await message.answer('Введи номер недели от 1 до 52')
+    elif message.text == 'x неделя, y день':
+        await state.set_state(SettingsAutomat.wait_exact_day_and_week)
+        await message.answer('Введи в формате неделя, день. Пример:\n<b>12, 6</b>, где 12 - неделя, а 6 - день')
 
 async def yesterday_reflections(message: Message):
     user_data = get_user_data(id_user=message.from_user.id)
@@ -164,3 +170,34 @@ async def get_week_number(message: Message):
             await message.answer('Блять ну сказано же от 1 до 52.')
     except ValueError or TypeError:
         await message.answer('Ты что-то ввел не то')
+
+@settings_router.message(SettingsAutomat.wait_exact_day_and_week)
+async def get_week_day_reflection(message: Message):
+    try:
+        week, day = message.text.split(', ')
+        if (1 <= int(week) <= 52) and (1 <= int(day) <= 7):
+            user_data = get_user_data(id_user=message.from_user.id)
+            book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
+
+            text = f'Неделя №{week}, день №{day}.\nВопрос: <i>{book_info[f"week_{week}"]["questions"][day]}</i>\n{60 * "-"}\n'
+
+            morning_reflections = user_data[week][day]["morning"]
+            evening_reflections = user_data[week][day]["evening"]
+
+            if morning_reflections:
+                text += '<b>Утренние размышления</b>:\n'
+                text += morning_reflections
+                text += f'\n{60 * "-"}\n'
+            if evening_reflections:
+                text += '<b>Вечерние размышления</b>:\n'
+                text += evening_reflections
+            if 'Утренние размышления' in text or 'Вечерние размышления' in text:
+                await message.answer(text=text, parse_mode='html', reply_markup=settings_kb())
+            else:
+                await message.answer('Ничего не заполненно')
+
+        else:
+            await message.answer('Неделей всего 52, дней в неделе сколько?')
+
+    except ValueError or TypeError:
+        await message.answer('Не понимаю')
