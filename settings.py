@@ -23,7 +23,10 @@ class SettingsAutomat(StatesGroup):
 
     waiting_answer = State()
     change_progress = State()
+
     chose_period_for_show = State()
+    wait_exact_week = State()
+
 @settings_router.message(Text('Прочее'))
 async def settings(message: Message):
     await message.answer("""
@@ -75,11 +78,14 @@ async def show_some_reflections(message: Message, state: FSMContext):
 
 
 @settings_router.message(SettingsAutomat.chose_period_for_show)
-async def show_reflections(message: Message):
+async def show_reflections(message: Message, state: FSMContext):
     if message.text == 'Вчера':
         await yesterday_reflections(message=message)
     elif message.text == 'Неделя':
         await week_reflections(message=message)
+    elif message.text == 'n неделя':
+        await state.set_state(SettingsAutomat.wait_exact_week)
+        await message.answer('Введи номер недели от 1 до 52')
 
 async def yesterday_reflections(message: Message):
     user_data = get_user_data(id_user=message.from_user.id)
@@ -115,13 +121,15 @@ async def yesterday_reflections(message: Message):
         text_to_ouput += evening_reflections
     await message.answer(text=text_to_ouput, parse_mode='html', reply_markup=settings_kb())
 
-async def week_reflections(message: Message):
+async def week_reflections(message: Message, n_week:str=None):
     user_data = get_user_data(id_user=message.from_user.id)
     book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
+    if n_week:
+        user_week = n_week
+    else:
+        user_week = str(user_data['cur_week'])
 
-    user_week = str(user_data['cur_week'])
-
-    texts_to_output = [f'Неделя №{user_data["cur_week"]}']
+    texts_to_output = [f'Неделя №{user_week}']
     for day in range(1, int(user_data['cur_day']) + 1):
         text = f'День №{day}. Вопрос: <i>{book_info[f"week_{user_week}"]["questions"][str(day)]}</i>\n{60 * "-"}\n'
 
@@ -145,3 +153,14 @@ async def week_reflections(message: Message):
             # добавление маркапа ко всем сообщениям не делает работу программы быстрее, так что пофиг пусть так будет, чем только на последнее сообщение
             await message.answer(text, parse_mode='html', reply_markup=settings_kb())
 
+
+@settings_router.message(SettingsAutomat.wait_exact_week)
+async def get_week_number(message: Message):
+    try:
+        user_week = int(message.text)
+        if 1 <= user_week <= 52:
+            await week_reflections(message=message, n_week=str(user_week))
+        else:
+            await message.answer('Блять ну сказано же от 1 до 52.')
+    except ValueError or TypeError:
+        await message.answer('Ты что-то ввел не то')
