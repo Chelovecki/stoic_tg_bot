@@ -20,6 +20,7 @@ from tools.keyboards.default import main_menu_kb, settings_kb, show_for_some_ref
 
 settings_router = Router()
 
+
 class SettingsAutomat(StatesGroup):
     null = State()
 
@@ -33,6 +34,7 @@ class SettingsAutomat(StatesGroup):
 
     wait_change_reflections = State()
 
+
 class ChangeReflections(StatesGroup):
     today_morning = State()
     today_evening = State()
@@ -40,8 +42,11 @@ class ChangeReflections(StatesGroup):
     yesterday_morning = State()
     yesterday_evening = State()
 
+    wait_some_data_morning = State()
     some_morning = State()
+    wait_some_data_evening = State()
     some_evening = State()
+
 
 def get_yesterday_week_day(now_week: int, now_day: int) -> tuple[int] or bool:
     if now_week == now_day == 1:
@@ -59,6 +64,7 @@ def get_yesterday_week_day(now_week: int, now_day: int) -> tuple[int] or bool:
 
     return yesterday_week, yesterday_day
 
+
 @settings_router.message(Text('Прочее'))
 async def settings(message: Message, state: FSMContext):
     await state.set_state(SettingsAutomat.null)
@@ -70,15 +76,20 @@ async def settings(message: Message, state: FSMContext):
 - <b>изменить размышления</b> - если начал следующий день, а в прошлом что-то не дописал или забыл
     """, reply_markup=settings_kb(), parse_mode='html')
 
+
 @settings_router.message(Text('Файл'))
 async def send_link_file(message: Message):
-    await message.answer('Уж прости, что я не сделал это по человечески отправкой файла. Лови ссылку:\nhttps://disk.yandex.ru/i/MXXxKc6bbjng1A')
+    await message.answer(
+        'Уж прости, что я не сделал это по человечески отправкой файла. Лови ссылку:\nhttps://disk.yandex.ru/i/MXXxKc6bbjng1A')
+
 
 @settings_router.message(Text('Изменить прогресс'))
 async def change_progress(message: Message, state: FSMContext):
     await state.set_state(SettingsAutomat.change_progress)
 
-    await message.answer(f'Окей, {message.from_user.first_name}, вводи новый прогресс в формате неделя *пробел* день. Пример:\n12 6\nгде 12 - неделя, а 6 - день')
+    await message.answer(
+        f'Окей, {message.from_user.first_name}, вводи новый прогресс в формате неделя *пробел* день. Пример:\n12 6\nгде 12 - неделя, а 6 - день')
+
 
 @settings_router.message(SettingsAutomat.change_progress)
 async def progress_handler(message: Message, state: FSMContext):
@@ -91,7 +102,9 @@ async def progress_handler(message: Message, state: FSMContext):
             user_data['cur_week'] = week_number
             user_data['cur_day'] = day_number
             write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
-            await message.answer('Я надеюсь, ты знаешь, что делаешь. Данные обновил. Проверить можешь, нажав "Размышления за сегодня"', reply_markup=main_menu_kb())
+            await message.answer(
+                'Я надеюсь, ты знаешь, что делаешь. Данные обновил. Проверить можешь, нажав "Размышления за сегодня"',
+                reply_markup=main_menu_kb())
         else:
             await message.answer('Всего есть 52 недели по 7 дней в каждой.')
     except ValueError:
@@ -114,15 +127,20 @@ async def show_some_reflections(message: Message, state: FSMContext):
 async def show_reflections(message: Message, state: FSMContext):
     if message.text == 'Вчера':
         await yesterday_reflections(message=message)
+
     elif message.text == 'Неделя':
         await week_reflections(message=message)
+
     elif message.text == 'n неделя':
         await state.set_state(SettingsAutomat.wait_exact_week)
         await message.answer('Введи номер недели от 1 до 52')
+
     elif message.text == 'x неделя, y день':
         await state.set_state(SettingsAutomat.wait_exact_day_and_week)
-        await message.answer('Введи в формате неделя, день. Пример:\n<b>12, 6</b>, где 12 - неделя, а 6 - день')
-    await state.set_state(SettingsAutomat.null)
+        await message.answer('Введи в формате <b>неделя *пробел* день</b>. Пример:\n<b>12 6</b>, где 12 - неделя, а 6 - день', parse_mode='html')
+
+
+
 
 async def yesterday_reflections(message: Message):
     user_data = get_user_data(id_user=message.from_user.id)
@@ -139,7 +157,7 @@ async def yesterday_reflections(message: Message):
     yesterday_week, yesterday_day = yesterday
 
     text_to_ouput = f'Неделя №{yesterday_week}, день №{yesterday_day}\n'
-    text_to_ouput += f'Вопрос: <i>{book_info[f"week_{yesterday_week}"]["questions"][str(yesterday_day)]}</i>\n{60*"-"}\n'
+    text_to_ouput += f'Вопрос: <i>{book_info[f"week_{yesterday_week}"]["questions"][str(yesterday_day)]}</i>\n{60 * "-"}\n'
 
     morning_reflections = user_data[str(yesterday_week)][str(yesterday_day)]["morning"]
     evening_reflections = user_data[str(yesterday_week)][str(yesterday_day)]["evening"]
@@ -152,7 +170,8 @@ async def yesterday_reflections(message: Message):
         text_to_ouput += evening_reflections
     await message.answer(text=text_to_ouput, parse_mode='html', reply_markup=settings_kb())
 
-async def week_reflections(message: Message, n_week:str=None):
+
+async def week_reflections(message: Message, n_week: str = None):
     user_data = get_user_data(id_user=message.from_user.id)
     book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
     if n_week:
@@ -196,10 +215,11 @@ async def get_week_number(message: Message):
     except ValueError or TypeError:
         await message.answer('Ты что-то ввел не то')
 
+
 @settings_router.message(SettingsAutomat.wait_exact_day_and_week)
 async def get_week_day_reflection(message: Message):
     try:
-        week, day = message.text.split(', ')
+        week, day = message.text.split(' ')
         if (1 <= int(week) <= 52) and (1 <= int(day) <= 7):
             user_data = get_user_data(id_user=message.from_user.id)
             book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
@@ -227,10 +247,13 @@ async def get_week_day_reflection(message: Message):
     except ValueError or TypeError:
         await message.answer('Не понимаю')
 
+
 @settings_router.message(Text('Изменить размышления'))
 async def change_reflections(message: Message, state: FSMContext):
     await state.set_state(SettingsAutomat.wait_change_reflections)
-    await message.answer('Можешь изменить за сегодня, за вчера, и за какой-то день недели', reply_markup=avaliable_change_reflections_period_kb())
+    await message.answer('Можешь изменить за сегодня, за вчера, и за какой-то день недели',
+                         reply_markup=avaliable_change_reflections_period_kb())
+
 
 @settings_router.message(SettingsAutomat.wait_change_reflections)
 async def change_reflections_handler(message: Message, state: FSMContext):
@@ -242,11 +265,13 @@ async def change_reflections_handler(message: Message, state: FSMContext):
         'Вот все то, что ты писал за этот день. Скопируй себе, отредактируй что надо (ну или полностью перепиши), а потом отправь мне этот текст, а я его сохраню')
     if message.text == 'Сегодня утро':
         await state.set_state(ChangeReflections.today_morning)
-        await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True, week=now_week, day=now_day)
+        await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True, week=now_week,
+                                         day=now_day)
 
     elif message.text == 'Сегодня вечер':
         await state.set_state(ChangeReflections.today_evening)
-        await send_reflections_to_change(message=message, state=state, user_data=user_data, evening=True, week=now_week, day=now_day)
+        await send_reflections_to_change(message=message, state=state, user_data=user_data, evening=True, week=now_week,
+                                         day=now_day)
 
     elif message.text in ('Вчера утро', 'Вчера вечер'):
         now_day = int(now_day)
@@ -262,16 +287,28 @@ async def change_reflections_handler(message: Message, state: FSMContext):
 
         if message.text == 'Вчера утро':
             await state.set_state(ChangeReflections.yesterday_morning)
-            await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True, week=yesterday_week,day=yesterday_day)
+            await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True,
+                                             week=yesterday_week, day=yesterday_day)
         else:
             await state.set_state(ChangeReflections.yesterday_evening)
             await send_reflections_to_change(message=message, state=state, user_data=user_data, evening=True,
                                              week=yesterday_week, day=yesterday_day)
 
-async def send_reflections_to_change(message: Message, user_data:dict, state: FSMContext, morning:bool=False, evening:bool=False, week:str=None, day:str=None):
+    elif message.text in ('Опред утро', 'Опред вечер'):
+        await message.answer(
+            'Ок, введи данные следующего вида: <b>неделя *пробел* день</b>. Пример:\n<b>12 6</b>, где 12 - неделя, а 6 - день',
+            parse_mode='html')
+        if message.text == 'Опред утро':
+            await state.set_state(ChangeReflections.wait_some_data_morning)
+        else:
+            await state.set_state(ChangeReflections.wait_some_data_evening)
+
+
+async def send_reflections_to_change(message: Message, user_data: dict, state: FSMContext, morning: bool = False,
+                                     evening: bool = False, week: str = None, day: str = None):
     book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
 
-    text = f'Неделя №{week}, день №{day}\nВопрос: <i>{book_info[f"week_{week}"]["questions"][day]}</i>\n{60*"-"}\n'
+    text = f'Неделя №{week}, день №{day}\nВопрос: <i>{book_info[f"week_{week}"]["questions"][day]}</i>\n{60 * "-"}\n'
     morning_info = user_data[week][day]["morning"]
     evening_info = user_data[week][day]["evening"]
 
@@ -294,7 +331,6 @@ async def send_reflections_to_change(message: Message, user_data:dict, state: FS
 
 @settings_router.message(ChangeReflections.today_morning)
 async def today_morning_handler(message: Message):
-
     user_data = get_user_data(id_user=message.from_user.id)
 
     week = str(user_data['cur_week'])
@@ -319,7 +355,6 @@ async def today_evening_handler(message: Message):
 
 @settings_router.message(ChangeReflections.yesterday_morning)
 async def yesterday_morning_handler(message: Message):
-
     user_data = get_user_data(id_user=message.from_user.id)
 
     week = str(user_data['cur_week'])
@@ -331,6 +366,7 @@ async def yesterday_morning_handler(message: Message):
     user_data[yesterday_week][yesterday_day]["morning"] = message.text
     write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
     await message.answer('Сохранил изменения в вчерашнем утре', reply_markup=settings_kb())
+
 
 @settings_router.message(ChangeReflections.yesterday_evening)
 async def yesterday_evening_handler(message: Message):
@@ -348,6 +384,81 @@ async def yesterday_evening_handler(message: Message):
     await message.answer('Сохранил изменения в вчерашнем вечере', reply_markup=settings_kb())
 
 
+@settings_router.message(ChangeReflections.wait_some_data_morning)
+async def some_day_morning_handler(message: Message, state: FSMContext):
+    try:
+        week, day = map(int, message.text.split(' '))
+        if not (1 <= week <= 52):
+            await message.answer('В книге есть только 52 недели🧐')
+            return
+        if not (1 <= day <= 7):
+            await message.answer('В неделе есть только 7 дней (вроде)🧐')
+            return
+
+            # я не придумал ничего лучше, чем как сделать в файлике данные, за которые надо перезаписать данные. ну ибо нереально блин
+        user_data = get_user_data(id_user=message.from_user.id)
+        user_data['week_change'] = week
+        user_data['day_change'] = day
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+
+        await state.set_state(ChangeReflections.some_morning)
+        await send_reflections_to_change(message=message, state=state,
+                                         user_data=get_user_data(id_user=message.from_user.id),
+                                         morning=True, week=str(week), day=str(day))
+    except ValueError or TypeError:
+        await message.answer('Неверно введенные данные')
 
 
+@settings_router.message(ChangeReflections.wait_some_data_evening)
+async def some_day_evening_handler(message: Message, state: FSMContext):
+    try:
+        week, day = map(int, message.text.split(' '))
+        if not (1 <= week <= 52):
+            await message.answer('В книге есть только 52 недели🧐')
+            return
+        if not (1 <= day <= 7):
+            await message.answer('В неделе есть только 7 дней (вроде)🧐')
+            return
 
+        # я не придумал ничего лучше, чем как сделать в файлике данные, за которые надо перезаписать данные. ну ибо нереально блин
+        user_data = get_user_data(id_user=message.from_user.id)
+        user_data['week_change'] = week
+        user_data['day_change'] = day
+        write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+
+        await state.set_state(ChangeReflections.some_morning)
+        await send_reflections_to_change(message=message, state=state,
+                                         user_data=get_user_data(id_user=message.from_user.id),
+                                         evening=True, week=str(week), day=str(day))
+    except ValueError or TypeError:
+        await message.answer('Неверно введенные данные')
+
+
+@settings_router.message(ChangeReflections.some_morning)
+async def some_morning_reflections_handler(message: Message):
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week_change = str(user_data['week_change'])
+    day_change = str(user_data['day_change'])
+    user_data[week_change][day_change]["morning"] = message.text
+
+    user_data['week_change'] = None
+    user_data['day_change'] = None
+
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил утренние размышления за какой-то там день', reply_markup=settings_kb())
+
+
+@settings_router.message(ChangeReflections.some_evening)
+async def some_evening_reflections_handler(message: Message):
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week_change = str(user_data['week_change'])
+    day_change = str(user_data['day_change'])
+    user_data[week_change][day_change]["evening"] = message.text
+
+    user_data['week_change'] = None
+    user_data['day_change'] = None
+
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил вечерние размышления за какой-то там день', reply_markup=settings_kb())

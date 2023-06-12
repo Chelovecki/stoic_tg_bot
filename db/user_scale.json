@@ -3,6 +3,8 @@
     "cur_week": null,
     "cur_day": null,
     "file_path": null,
+    "week_change": null,
+    "day_change": null,
     "1": {
         "1": {
             "morning": null,
