@@ -36,6 +36,8 @@ class SettingsAutomat(StatesGroup):
 
 
 class ChangeReflections(StatesGroup):
+    null = State()
+
     today_morning = State()
     today_evening = State()
 
@@ -318,10 +320,12 @@ async def send_reflections_to_change(message: Message, user_data: dict, state: F
 
     # если ничего чел не писал, то пишем ему и брейкаем функцию
     if morning_info is None and morning:
-        await message.answer('А ты писал что-то утром, чтобы это можно было изменять?')
+        await message.answer('А ты писал что-то утром, чтобы это можно было изменять?', reply_markup=settings_kb())
+        await state.set_state(ChangeReflections.null)
         return
-    if evening_info is None and evening:
-        await message.answer('А ты писал что-то вечером, чтобы это можно было изменять?')
+    elif evening_info is None and evening:
+        await message.answer('А ты писал что-то вечером, чтобы это можно было изменять?', reply_markup=settings_kb())
+        await state.set_state(ChangeReflections.null)
         return
 
     if morning:
