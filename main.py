@@ -51,8 +51,22 @@ class Filling_User_Info(StatesGroup):
 # Хэндлер на команду /start
 @dp.message(Command('start'))
 async def cmd_start(message: Message):
-    add_user_in_db(id_user=message.from_user.id)
-    await message.answer('Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?', reply_markup=process_new_user())
+    try:
+        user_data = get_user_data(id_user=message.from_user.id)
+        if user_data is None:
+            add_user_in_db(id_user=message.from_user.id)
+            await message.answer(
+                'Привет, ты мне написал, а значит... ты мне написал. Давай короче к делу. Ты уже заполняешь эту книгу, или ты впервый раз?',
+                reply_markup=process_new_user())
+        else:
+            await message.answer('Какой тебе /start. Иди в "Прочее", и там меняй свой прогресс',
+                                 reply_markup=main_menu_kb())
+    except FileNotFoundError:
+        add_user_in_db(id_user=message.from_user.id)
+        await cmd_start(message=message)
+
+
+
 
 
 
@@ -65,14 +79,12 @@ async def main_menu(message: Message):
 @dp.message(Text('Я уже заполняю дневник'))
 async def im_yet(message: Message, state: FSMContext):
     await state.set_state(Filling_User_Info.await_week_day_info)
-    await message.answer(text='Введи свой прогресс в формате номер_недели:какой_по_счету_день_недели')
+    await message.answer(text='Введи свой прогресс вида <b>неделя *пробел* день</b>. Пример:\n<b>12 7</b>, где 12 - неделя, 7 - день')
 
 @dp.message(Text('Я еще не смешарик'))
 async def im_not_yet(message: Message):
     user_data = get_user_data(id_user=message.from_user.id)
-    if user_data['cur_week'] and user_data['cur_day']:
-        await message.answer('ты не можешь сбросить свои данные крч мне бля впадлу щас все пилить все эти да нет деревья')
-        return
+
     user_data['cur_week'] = 1
     user_data['cur_day'] = 1
     user_data['file_path'] = os.path.join(os.path.abspath('db'), 'users_data', f'{message.from_user.id}.json')
@@ -82,18 +94,25 @@ async def im_not_yet(message: Message):
 @dp.message(Filling_User_Info.await_week_day_info)
 async def get_cur_week_and_day(message: Message, state: FSMContext):
     try:
-        week, day = message.text.split(':')
+        week, day = message.text.split(' ')
         if not(1 <= int(week) <= 52):
-            raise Exception
+            await message.answer('В книге рассматривается 52 недели')
+            return
         if not(1 <= int(day) <= 7):
-            raise Exception
+            await message.answer('Бро, в неделе же только 7 дней...')
+            return
+
         await state.set_state(Filling_User_Info.null)
         user_data = get_user_data(id_user=message.from_user.id)
+
         user_data['cur_week'] = week
         user_data['cur_day'] = day
+
         user_data['file_path'] = os.path.join(os.path.abspath('db'), 'users_data', f'{message.from_user.id}.json')
         write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
         await message.answer('Ок', reply_markup=main_menu_kb())
+    except ValueError or TypeError:
+        await message.answer('Ты ввел что-то не то')
 
         
     except Exception as e:
