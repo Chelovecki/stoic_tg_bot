@@ -4,6 +4,7 @@ from aiogram import Router
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Text
 
+from typing import Union
 # для получения информации о пользователе
 from db.main_commands import get_user_data
 
@@ -14,7 +15,8 @@ from tools.json import read_from_json, write_in_json
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-from tools.keyboards.default import main_menu_kb, settings_kb, show_for_some_reflections
+from tools.keyboards.default import main_menu_kb, settings_kb, show_for_some_reflections, \
+    avaliable_change_reflections_period_kb
 
 settings_router = Router()
 
@@ -29,9 +31,37 @@ class SettingsAutomat(StatesGroup):
     wait_exact_week = State()
     wait_exact_day_and_week = State()
 
+    wait_change_reflections = State()
+
+class ChangeReflections(StatesGroup):
+    today_morning = State()
+    today_evening = State()
+
+    yesterday_morning = State()
+    yesterday_evening = State()
+
+    some_morning = State()
+    some_evening = State()
+
+def get_yesterday_week_day(now_week: int, now_day: int) -> tuple[int] or bool:
+    if now_week == now_day == 1:
+        return False
+
+    if now_day == 1 and now_week == 2:
+        yesterday_day = 7
+        yesterday_week = 1
+    elif now_day == 1:
+        yesterday_day = 7
+        yesterday_week = now_week - 1
+    else:
+        yesterday_day = now_day - 1
+        yesterday_week = now_week
+
+    return yesterday_week, yesterday_day
 
 @settings_router.message(Text('Прочее'))
-async def settings(message: Message):
+async def settings(message: Message, state: FSMContext):
+    await state.set_state(SettingsAutomat.null)
     await message.answer("""
     Что здесь находится:
 - <b>файл</b> - получишь ссылку на файл
@@ -68,7 +98,7 @@ async def progress_handler(message: Message, state: FSMContext):
         await message.answer('Ты ввел что-то неправильно')
 
 
-@settings_router.message(Text('Размышления'))
+@settings_router.message(Text('Показать размышления'))
 async def show_some_reflections(message: Message, state: FSMContext):
     await state.set_state(SettingsAutomat.chose_period_for_show)
     await message.answer("""
@@ -92,6 +122,7 @@ async def show_reflections(message: Message, state: FSMContext):
     elif message.text == 'x неделя, y день':
         await state.set_state(SettingsAutomat.wait_exact_day_and_week)
         await message.answer('Введи в формате неделя, день. Пример:\n<b>12, 6</b>, где 12 - неделя, а 6 - день')
+    await state.set_state(SettingsAutomat.null)
 
 async def yesterday_reflections(message: Message):
     user_data = get_user_data(id_user=message.from_user.id)
@@ -100,18 +131,12 @@ async def yesterday_reflections(message: Message):
 
     now_week = int(user_data['cur_week'])
     now_day = int(user_data['cur_day'])
-    if now_week == now_day == 1:
+
+    yesterday = get_yesterday_week_day(now_week=now_week, now_day=now_day)
+    if not yesterday:
         await message.answer('Головой подумай как это может быть')
         return
-    if now_day == 1 and now_week == 2:
-        yesterday_day = 7
-        yesterday_week = 1
-    elif now_day == 1:
-        yesterday_day = 7
-        yesterday_week = now_week - 1
-    else:
-        yesterday_day = now_day - 1
-        yesterday_week = now_week
+    yesterday_week, yesterday_day = yesterday
 
     text_to_ouput = f'Неделя №{yesterday_week}, день №{yesterday_day}\n'
     text_to_ouput += f'Вопрос: <i>{book_info[f"week_{yesterday_week}"]["questions"][str(yesterday_day)]}</i>\n{60*"-"}\n'
@@ -201,3 +226,128 @@ async def get_week_day_reflection(message: Message):
 
     except ValueError or TypeError:
         await message.answer('Не понимаю')
+
+@settings_router.message(Text('Изменить размышления'))
+async def change_reflections(message: Message, state: FSMContext):
+    await state.set_state(SettingsAutomat.wait_change_reflections)
+    await message.answer('Можешь изменить за сегодня, за вчера, и за какой-то день недели', reply_markup=avaliable_change_reflections_period_kb())
+
+@settings_router.message(SettingsAutomat.wait_change_reflections)
+async def change_reflections_handler(message: Message, state: FSMContext):
+    user_data = get_user_data(id_user=message.from_user.id)
+    now_week = str(user_data['cur_week'])
+    now_day = str(user_data['cur_day'])
+
+    await message.answer(
+        'Вот все то, что ты писал за этот день. Скопируй себе, отредактируй что надо (ну или полностью перепиши), а потом отправь мне этот текст, а я его сохраню')
+    if message.text == 'Сегодня утро':
+        await state.set_state(ChangeReflections.today_morning)
+        await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True, week=now_week, day=now_day)
+
+    elif message.text == 'Сегодня вечер':
+        await state.set_state(ChangeReflections.today_evening)
+        await send_reflections_to_change(message=message, state=state, user_data=user_data, evening=True, week=now_week, day=now_day)
+
+    elif message.text in ('Вчера утро', 'Вчера вечер'):
+        now_day = int(now_day)
+        now_week = int(now_week)
+
+        yesterday = get_yesterday_week_day(now_week=now_week, now_day=now_day)
+
+        if not yesterday:
+            await message.answer('Какое тебе вчера? Ты только первый день заполняешь дневник')
+            return
+
+        yesterday_week, yesterday_day = map(str, yesterday)
+
+        if message.text == 'Вчера утро':
+            await state.set_state(ChangeReflections.yesterday_morning)
+            await send_reflections_to_change(message=message, state=state, user_data=user_data, morning=True, week=yesterday_week,day=yesterday_day)
+        else:
+            await state.set_state(ChangeReflections.yesterday_evening)
+            await send_reflections_to_change(message=message, state=state, user_data=user_data, evening=True,
+                                             week=yesterday_week, day=yesterday_day)
+
+async def send_reflections_to_change(message: Message, user_data:dict, state: FSMContext, morning:bool=False, evening:bool=False, week:str=None, day:str=None):
+    book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
+
+    text = f'Неделя №{week}, день №{day}\nВопрос: <i>{book_info[f"week_{week}"]["questions"][day]}</i>\n{60*"-"}\n'
+    morning_info = user_data[week][day]["morning"]
+    evening_info = user_data[week][day]["evening"]
+
+    # если ничего чел не писал, то пишем ему и брейкаем функцию
+    if morning_info is None and morning:
+        await message.answer('А ты писал что-то утром, чтобы это можно было изменять?')
+        return
+    if evening_info is None and evening:
+        await message.answer('А ты писал что-то вечером, чтобы это можно было изменять?')
+        return
+
+    if morning:
+        text += f'<b>Утренние размышления:</b>\n'
+        await message.answer(f'{text}<code>{morning_info}</code>', parse_mode='html')
+
+    if evening:
+        text += f'<b>Вечерние размышления:</b>\n'
+        await message.answer(f'{text}<code>{evening_info}</code>', parse_mode='html')
+
+
+@settings_router.message(ChangeReflections.today_morning)
+async def today_morning_handler(message: Message):
+
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week = str(user_data['cur_week'])
+    day = str(user_data['cur_day'])
+
+    user_data[week][day]["morning"] = message.text
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил изменения в сегодняшнем утре', reply_markup=settings_kb())
+
+
+@settings_router.message(ChangeReflections.today_evening)
+async def today_evening_handler(message: Message):
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week = str(user_data['cur_week'])
+    day = str(user_data['cur_day'])
+
+    user_data[week][day]["evening"] = message.text
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил изменения в сегодняшнем вечере', reply_markup=settings_kb())
+
+
+@settings_router.message(ChangeReflections.yesterday_morning)
+async def yesterday_morning_handler(message: Message):
+
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week = str(user_data['cur_week'])
+    day = str(user_data['cur_day'])
+
+    yesterday = get_yesterday_week_day(now_week=int(week), now_day=int(day))
+    yesterday_week, yesterday_day = map(str, yesterday)
+
+    user_data[yesterday_week][yesterday_day]["morning"] = message.text
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил изменения в вчерашнем утре', reply_markup=settings_kb())
+
+@settings_router.message(ChangeReflections.yesterday_evening)
+async def yesterday_evening_handler(message: Message):
+    user_data = get_user_data(id_user=message.from_user.id)
+
+    week = user_data['cur_week']
+    day = user_data['cur_day']
+
+    yesterday = get_yesterday_week_day(now_week=week, now_day=day)
+
+    yesterday_week, yesterday_day = map(str, yesterday)
+
+    user_data[yesterday_week][yesterday_day]["evening"] = message.text
+    write_in_json(name_and_path=user_data['file_path'], dictionary=user_data)
+    await message.answer('Сохранил изменения в вчерашнем вечере', reply_markup=settings_kb())
+
+
+
+
+
