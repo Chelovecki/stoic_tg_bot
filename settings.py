@@ -125,11 +125,12 @@ async def show_some_reflections(message: Message, state: FSMContext):
 
 @settings_router.message(SettingsAutomat.chose_period_for_show)
 async def show_reflections(message: Message, state: FSMContext):
+
     if message.text == 'Вчера':
         await yesterday_reflections(message=message)
 
     elif message.text == 'Неделя':
-        await week_reflections(message=message)
+        await week_reflections(message=message, state=state)
 
     elif message.text == 'n неделя':
         await state.set_state(SettingsAutomat.wait_exact_week)
@@ -171,7 +172,8 @@ async def yesterday_reflections(message: Message):
     await message.answer(text=text_to_ouput, parse_mode='html', reply_markup=settings_kb())
 
 
-async def week_reflections(message: Message, n_week: str = None):
+async def week_reflections(message: Message, state: FSMContext, n_week: str = None):
+    await state.set_state(SettingsAutomat.null)
     user_data = get_user_data(id_user=message.from_user.id)
     book_info = read_from_json(os.path.join(os.path.abspath(''), 'db', 'book_info.json'))
     if n_week:
@@ -205,11 +207,11 @@ async def week_reflections(message: Message, n_week: str = None):
 
 
 @settings_router.message(SettingsAutomat.wait_exact_week)
-async def get_week_number(message: Message):
+async def get_week_number(message: Message, state: FSMContext):
     try:
         user_week = int(message.text)
         if 1 <= user_week <= 52:
-            await week_reflections(message=message, n_week=str(user_week))
+            await week_reflections(message=message, state=state, n_week=str(user_week))
         else:
             await message.answer('Блять ну сказано же от 1 до 52.')
     except ValueError or TypeError:
@@ -217,7 +219,7 @@ async def get_week_number(message: Message):
 
 
 @settings_router.message(SettingsAutomat.wait_exact_day_and_week)
-async def get_week_day_reflection(message: Message):
+async def get_week_day_reflection(message: Message, state: FSMContext):
     try:
         week, day = message.text.split(' ')
         if (1 <= int(week) <= 52) and (1 <= int(day) <= 7):
@@ -246,6 +248,8 @@ async def get_week_day_reflection(message: Message):
 
     except ValueError or TypeError:
         await message.answer('Не понимаю')
+    finally:
+        await state.set_state(SettingsAutomat.null)
 
 
 @settings_router.message(Text('Изменить размышления'))
